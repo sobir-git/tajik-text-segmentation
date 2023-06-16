@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from src.dataset import load_dataset, tokenize_annotation
+from src.heuristic_model import Features, HeuristicModel
 from src.nn_model.dataset import SentenceBoundaryDataset
 from src.nn_model.model import SentenceBoundaryModel, batch_to_device
 
@@ -31,6 +32,7 @@ class Checkpoint:
 
     def load(self, device='cpu'):
         checkpoint = torch.load(self.path, map_location=device)
+        print(f"Loaded checkpoint: {self.path}; metrics: {checkpoint['metrics']}")
         self.config = checkpoint['config']
         self.metrics = checkpoint['metrics']
         self.model.load_state_dict(checkpoint['model'])
@@ -39,6 +41,8 @@ class Checkpoint:
     @classmethod
     def init_from_path(cls, path, device='cpu'):
         checkpoint = torch.load(path, map_location=device)
+        print(f"Loaded checkpoint: {path}; metrics: {checkpoint['metrics']}")
+        
         config = checkpoint['config']
 
         # init model and vocab
@@ -66,8 +70,10 @@ def train(model, optimizer, criterion, train_dataset, test_dataset, num_epochs=1
     # initialize a new average loss tracker
     avg_loss = Average()
 
+    step = 0
+
     for epoch in range(num_epochs):
-        for i, batch_idx in enumerate(torch.randperm(len(train_dataset))):
+        for batch_idx in torch.randperm(len(train_dataset)):
             
             sample = train_dataset[batch_idx]
             sample = batch_to_device(sample, device)
@@ -83,24 +89,25 @@ def train(model, optimizer, criterion, train_dataset, test_dataset, num_epochs=1
             optimizer.zero_grad()
 
             # scale loss by the sequence length
-            loss_scaled = loss * labels.size(0) / avg_seq_len
+            loss = loss * labels.size(0) / avg_seq_len
 
-            loss_scaled.backward()
+            loss.backward()
             
             # clip gradient norms
             torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
 
             optimizer.step()
+            step += 1
             
             avg_loss.update(loss.item(), labels.size(0))
 
             # Logging time
-            if i % min(90,  len(train_dataset)) == 0:
+            if step % min(90,  len(train_dataset)) == 0:
                 lr = optimizer.param_groups[0]['lr']
                 print(f'Epoch {epoch} -------------------------> TrainLoss: {avg_loss.get_value():.4f} lr: {lr:.5f}')
                 
                 # Log to wandb
-                wandb.log({'train_loss': avg_loss.get_value(), 'lr': lr})
+                wandb.log({'train_loss': avg_loss.get_value(), 'lr': lr}, step=step)
 
                 # update scheduler
                 if lr_scheduler:
@@ -110,7 +117,7 @@ def train(model, optimizer, criterion, train_dataset, test_dataset, num_epochs=1
                 avg_loss = Average()
 
                 # evaluate and checkpoint
-                val_loss, f1_score = eval(model, criterion, test_dataset, device)
+                val_loss, f1_score = eval(model, criterion, test_dataset, device, step=step)
                 if f1_score > best_score:
                     if checkpoint:
                         checkpoint.save()
@@ -122,7 +129,7 @@ def train(model, optimizer, criterion, train_dataset, test_dataset, num_epochs=1
 
 
 @torch.no_grad()
-def eval(model, criterion, dataset, device='cpu'):
+def eval(model, criterion, dataset, device='cpu', step=0):
     model.eval()  # set the model to evaluation mode
     error_rates = Average()
     avg_loss = Average()
@@ -180,27 +187,26 @@ def eval(model, criterion, dataset, device='cpu'):
             'Rec[Start]': recalls.get_value()[0],
             'Rec[End]': recalls.get_value()[1]
         }
-        
-    })
+    }, step=step)
     
     return avg_loss.get_value(), f1_scores.get_value().mean().item()
 
 
 def run_training():
-    seed_everything(0)
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+    
     print('Loading dataset...')
     annotations = load_dataset()
     
+    print('Creating vocabulary...')
+    vocab = Vocabulary()
+    vocab.build_from_texts([ann['text'] for ann in annotations])
+
     print('Tokenizing dataset...')
     annotations = [tokenize_annotation(ann) for ann in annotations]
 
-    print('Creating vocabulary...')
-    vocab = Vocabulary()
 
     config = {
+        'seed': 0,
         'input_size': len(vocab),
         'emb_size': 48,
         'num_layers': 1,
@@ -208,15 +214,33 @@ def run_training():
         'n_tags': len(vocab.tagnames),
         'output_size': 2,
         'dropout': 0.5,
+        'optimizer_kwargs': {'lr': 0.003, 'weight_decay': 0.00001},
+        'lr_scheduler': 'CosineAnnealingWarmRestarts',
+        'lr_scheduler_kwargs': {'T_0': 60},
+        # 'lr_scheduler_kwargs': {'T_0': 20},
+        # 'lr_scheduler': 'StepLR',
+        # 'lr_scheduler_kwargs': {'step_size': 50,'gamma': 0.1},
+        # 'dataset_kwargs': {'shuffle': False}, 
+        'dataset_kwargs': {'shuffle': True, 'window_size': 3, 'batch_size': 8}, 
+        'n_features': Features.get_n_features(),
+        'feature_transform': False,
+        'use_heuristic_predictions': True
     }
+    print('Config:', config)
+
     wandb.init(config=config)
+
+    seed_everything(config['seed'])
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Create model, optimizer, criterion
     criterion = nn.BCEWithLogitsLoss()
     model = SentenceBoundaryModel(config).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.003, weight_decay=0.000001)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 60, 1)
-    
+    optimizer = torch.optim.Adam(model.parameters(), **config['optimizer_kwargs'])
+    lr_scheduler_class = getattr(torch.optim.lr_scheduler, config['lr_scheduler'])
+    lr_scheduler = lr_scheduler_class(optimizer, **config['lr_scheduler_kwargs'])
+
     # split dataset into train and test
     train_size = int(len(annotations) * 0.8)
     test_size = len(annotations) - train_size
@@ -225,18 +249,20 @@ def run_training():
     test_annotations = [annotations[i] for i in indices[train_size:]]
 
     # Create shuffled/mixed dataset
-    WINDOW_SIZE=3
-    N_SENTENCES=8
-    # train_dataset = SentenceBoundaryDataset(train_annotations, vocab, shuffle=False)
-    train_dataset = SentenceBoundaryDataset(train_annotations, vocab, shuffle=True, window_size=WINDOW_SIZE, batch_size=N_SENTENCES)
-    test_dataset = SentenceBoundaryDataset(test_annotations, vocab, shuffle=False)
+    heuristic_model = HeuristicModel() if config['use_heuristic_predictions'] else None
+    train_dataset = SentenceBoundaryDataset(train_annotations, vocab, **config['dataset_kwargs'], heuristic_model=heuristic_model)
+    test_dataset = SentenceBoundaryDataset(test_annotations, vocab, shuffle=False, heuristic_model=heuristic_model)
     print('train_size:', train_size)
     print('test_size:', test_size)
 
     checkpoint = Checkpoint('checkpoints/checkpoint.pt', config, model, vocab)
 
-    # Launch training
-    train(model, optimizer, criterion, train_dataset, test_dataset, device=device, lr_scheduler=lr_scheduler, checkpoint=checkpoint)
+    try:
+        # Launch training
+        train(model, optimizer, criterion, train_dataset, test_dataset, device=device, lr_scheduler=lr_scheduler, checkpoint=checkpoint)
+    except KeyboardInterrupt:
+        print('Stop training...')
+        wandb.finish()
 
 
 if __name__ == '__main__':

@@ -1,9 +1,11 @@
 from collections import Counter
 import string
+import numpy as np
 
 import torch
 
 from src.dataset import load_dataset
+from src.heuristic_model import Features
 
 
 class Vocabulary:
@@ -14,20 +16,23 @@ class Vocabulary:
         self.punctuations = ''.join(['?', '«', '»', ':', '.', ',', '—', '!', '-', ';', '–', '…', '”', '“', '"', '@', '№', '=', '%', '’', '‘']) + string.punctuation
         self.tagnames = ('PUNCT', 'UPPER', 'PERIOD', 'CYRILLIC', 'LATIN', 'ARABIC', 'OPENING', 'CLOSING')
         self.tag_to_id = {t: i for i, t in enumerate(self.tagnames)}
-        self.symbols = ['UNK', 'LETTER_LOWER', 'LETTER_UPPER', 'WHITESPACE', 'LINEBREAK', 'DIGIT']
-        self.symbol_to_id = {c: i for i, c in enumerate(self.symbols)}
+        self.symbols_default = ['UNK', 'LETTER_LOWER', 'LETTER_UPPER', 'WHITESPACE', 'LINEBREAK', 'DIGIT']
+        self.symbols = None
+        self.symbol_to_id = None
 
     def state_dict(self):
         return {
             'symbols': self.symbols,
+            'symbols_default': self.symbols_default,
             'symbol_to_id': self.symbol_to_id,
             'tag_to_id': self.tag_to_id,
             'tagnames': self.tagnames,
-            'punctuations': self.punctuations
+            'punctuations': self.punctuations,
         }
 
     def load_state_dict(self, state_dict):
         self.symbols = state_dict['symbols']
+        self.symbols_default = state_dict['symbols_default']
         self.symbol_to_id = state_dict['symbol_to_id']
         self.tag_to_id = state_dict['tag_to_id']
         self.tagnames = state_dict['tagnames']
@@ -66,10 +71,11 @@ class Vocabulary:
         
         return tags
 
-    def build_from_texts(self, texts, threshold=2):
+    def build_from_texts(self, texts: "list[str]", threshold=2):
+        self.symbols = self.symbols_default[:]
         charcounter = Counter()
         for text in texts:
-            charcounter.update(set(text)) 
+            charcounter.update(set(text))
 
         # add all non-letter characters that appear at least in 
         # sufficient number of files to the vocabulary
@@ -105,7 +111,7 @@ class Vocabulary:
 
         return ids, tags
 
-    def encode_tokens(self, tokens: "list[str]"):
+    def encode_tokens(self, tokens: "list[str]", feature_extract=True):
         '''Encodes tokens to be readily input to model.'''
         sizes = torch.tensor([len(token) for token in tokens], dtype=torch.long)  # (n_tokens,)
         char_enc, tag_enc = zip(*(self.encode_text(token, return_tensors=True) for token in tokens))
@@ -114,12 +120,18 @@ class Vocabulary:
         # tag_encodings is a list of arrays of size (token_size, n_tags)
         tag_enc = torch.nn.utils.rnn.pad_sequence(tag_enc, batch_first=True)  # (n_tokens, max_token_size, n_tags)
 
+        features = None
+        if feature_extract:
+            features = [Features(token).to_vector() for token in tokens]
+            features = np.stack(features)
+            features = torch.from_numpy(features).long()
+
         return {
             'char_enc': char_enc,
             'tag_enc': tag_enc,
-            'sizes': sizes
+            'sizes': sizes,
+            'features': features
         }
-
 
 
     def __len__(self):

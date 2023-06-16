@@ -3,12 +3,13 @@ from typing import List
 from torch.utils.data import Dataset
 import torch
 from src.dataset import Annotated, load_dataset, tokenize_annotation
+from src.heuristic_model import HeuristicModel
 
 from src.nn_model.vocab import Vocabulary
 
 
 class SentenceBoundaryDataset(Dataset):
-    def __init__(self, annotations: List[Annotated], vocab: Vocabulary, shuffle:bool=False, loops: int=100, batch_size:int=3, window_size:int=3, sep:str='   \n'):
+    def __init__(self, annotations: List[Annotated], vocab: Vocabulary, shuffle:bool=False, loops: int=100, batch_size:int=3, window_size:int=3, sep:str='   \n', heuristic_model: HeuristicModel=None):
 
         if shuffle:
             # arrange all sentences in a sequence
@@ -31,6 +32,7 @@ class SentenceBoundaryDataset(Dataset):
         self.sep = sep
         self.shuffle = shuffle
         self.annotated_texts = annotations
+        self.heuristic_model = heuristic_model
 
     def __len__(self):
         '''Return the 'number of samples' of the dataset.'''
@@ -121,7 +123,11 @@ class SentenceBoundaryDataset(Dataset):
         '''Prepares item for training.'''
 
         pack = self.vocab.encode_tokens(item.tokens)
+        if self.heuristic_model:
+            heuristic_predictions = self.heuristic_model.predict(item.tokens)
+            pack['heuristic_predictions'] = torch.tensor(heuristic_predictions, dtype=torch.float)
         pack['labels'] = torch.tensor([item.start_labels, item.end_labels], dtype=torch.long).T  # (n_tokens, 2)
+        pack['item'] = item
 
         return pack
 
@@ -129,6 +135,10 @@ class SentenceBoundaryDataset(Dataset):
 if __name__ == '__main__':
     print('Loading dataset...')
     annotations = load_dataset()
+
+    print('Creating vocabulary...')
+    vocab = Vocabulary()
+    vocab.build_from_texts([ann['text'] for ann in annotations])
     
     # tokenize dataset
     print('Tokenizing dataset...')
@@ -136,9 +146,6 @@ if __name__ == '__main__':
     # print(annotations[5])
     # print(annotations[5].select_spans(1,5))
     # print(annotations[5].select_spans(1,3).merge(annotations[5].select_spans(3,5), separator=' '))
-
-    print('Creating vocabulary...')
-    vocab = Vocabulary()
 
     dataset = SentenceBoundaryDataset(annotations, vocab, shuffle=True)
     print(dataset[6])

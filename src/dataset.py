@@ -149,6 +149,12 @@ class Annotated:
             buffer.append(f'{prefix}{token}{suffix}')
         return ''.join(buffer)
 
+    def get_sentences(self):
+        sentences = []
+        for s,e in self.spans:
+            sentences.append(''.join(self.tokens[s:e]))
+        return sentences
+
 
 def load_dataset():
     annotations = datasets.load_dataset('sobir-hf/tajik-text-segmentation', split='train')
@@ -208,21 +214,16 @@ def get_labels(spans, indices):
 
     i = 0  # token index
     for j in indices:
-        # # find token that contains start of span
-        # # while current token ends before start of span
-        # while i < len(spans) and spans[i][1] <= j:
-        #     i += 1
+        # find token that contains start of span
+        # while current token ends before start of span
+        while i < len(spans) and spans[i][1] <= j:
+            i += 1
         
-        # if i == len(spans):
-        #     break  # reached the end of the text
+        if i == len(spans):
+            break  # reached the end of the text
         
-        # # check if current token contains the start of span
-        # if spans[i][0] <= j:
-        #     labels[i] = 1
-
-        # TODO: optimize
-        for i, (s, e) in enumerate(spans):
-            if e > j >= s:
-                labels[i] = 1
+        # check if current token contains the start of span
+        if spans[i][0] <= j:
+            labels[i] = 1
 
     return labels

@@ -1,0 +1,18 @@
+{
+    "models": {
+        "nn": {
+            "checkpoint_path": "checkpoints/checkpoint.pt",
+            "resolver_kwargs": {
+                "max_candidates": 10, 
+                "candidate_threshold":0.25
+            }
+        },
+        "heuristic": {
+            "predictor_kwargs": {"damping": 0.025},
+            "resolver_kwargs": {
+                "max_candidates": 5, 
+                "candidate_threshold":0.25
+            }
+        }
+    }
+}

@@ -7,8 +7,8 @@ def tokenize_text(text):
 
     matches = re.finditer(regex, text, re.MULTILINE | re.UNICODE)
 
-    tokens = []
-    spans = []
+    tokens: "list[str]" = []
+    spans: "list[tuple[int,int]]" = []
         
     for match in matches:
         start = match.start()

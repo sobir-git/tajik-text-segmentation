@@ -3,8 +3,10 @@ from sklearn.metrics import precision_recall_fscore_support
 
 from src.dataset import Annotated, load_dataset, tokenize_annotation
 from src.heuristic_model import HeuristicModel
-from src.nn_model.model import NNPredictor, SentenceBoundaryModel
+from src.nn_model.boundary_resolver import SentenceBoundaryResolver
+from src.nn_model.model import NNPredictor
 from src.nn_model.train import Checkpoint
+from src.text_segmenter import load_predictor
 
 
 def evaluate_segmentation(labels: np.ndarray, predictions: np.ndarray):
@@ -123,15 +125,14 @@ def generate_report(tokens: "list[str]", pred: np.ndarray, start_labels: np.ndar
 
 if __name__ == '__main__':
     annotations = load_dataset()
-    # annotations = load_dataset()[90:]
-    # results = evaluate_from_text(HeuristicModel(), annotations, display_report=True)
+    
+    # predictor = load_predictor('heuristic')
+    # results = evaluate_from_text(predictor, annotations, display_report=True)
     # print("Heuristic model results:")
     # print(results)
 
     # neural network results
-    # load model
-    checkpoint = Checkpoint.init_from_path("checkpoints/checkpoint.pt")
-    predictor = NNPredictor(checkpoint.model, checkpoint.vocab)
+    predictor = load_predictor('nn')
     results = evaluate_from_text(predictor, annotations, display_report=True)
     print("Neural network results:")
     print(results)

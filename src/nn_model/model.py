@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 
 from src.dataset import load_dataset, tokenize_annotation
+from src.heuristic_model import Features, HeuristicModel
+from src.nn_model.boundary_resolver import SentenceBoundaryResolver
 from src.nn_model.dataset import SentenceBoundaryDataset
 from src.nn_model.vocab import Vocabulary
 
@@ -61,32 +63,53 @@ class SentenceBoundaryModel(nn.Module):
         config.update(**kwargs)
         self.embedding = BOWEmbedding(config)
         self.gru = nn.GRU(config['emb_size'], config['hidden_size'], config['num_layers'], batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(config['hidden_size'] * 2, config['output_size'])  # times 2 because of bidirectionality
+        self.fc = nn.Linear(config['hidden_size'] * 2 + config['n_features'] + (2 if config['use_heuristic_predictions'] else 0), config['output_size'])  # times 2 because of bidirectionality
+        self.ft = nn.Identity()
+        if config['feature_transform']:
+            self.ft = nn.Sequential(*[
+                nn.Linear(config['n_features'], config['n_features']),
+                nn.PReLU()
+            ])
         self.config = config
 
     def forward(self, sample):
         x = self.embedding(sample)
         out, _ = self.gru(x)
+        if self.config['n_features']:
+            features = sample['features'].float()
+            features = self.ft(features)
+            out = torch.cat([out, features], -1)
+        if self.config['use_heuristic_predictions']:
+            out = torch.cat([out, sample['heuristic_predictions']], -1)
+
         out = self.fc(out)
         return out
 
 
 class NNPredictor:
-    def __init__(self, model: nn.Module, vocab: Vocabulary) -> None:
+    def __init__(self, config, model: nn.Module, vocab: Vocabulary, resolver: SentenceBoundaryResolver) -> None:
         self.model = model
         self.vocab = vocab
+        self.resolver = resolver
+        self.heuristic_model = HeuristicModel() if config['use_heuristic_predictions'] else None
 
+    @torch.no_grad()
     def predict(self, tokens: "list[str]"):
-        x = self.vocab.encode_tokens(tokens)
-        logits = self.model(x)
-        preds = logits > 0
+        self.model.eval()
+        pack = self.vocab.encode_tokens(tokens)
+        if self.heuristic_model:
+            heuristic_predictions = self.heuristic_model.predict(tokens)
+            pack['heuristic_predictions'] = torch.tensor(heuristic_predictions, dtype=torch.float)
+        logits = self.model(pack)
+        probs = torch.sigmoid(logits).cpu().numpy()
+        preds = self.resolver.resolve(probs, binarize_output=True)
         return preds
 
 
-def batch_to_device(batch, device):
-    for k in ['char_enc', 'tag_enc', 'labels', 'sizes']:
-        batch[k] = batch[k].to(device)
-    return batch
+def batch_to_device(batch: dict, device):
+    return {
+        k: v.to(device) if isinstance(v, torch.Tensor) else v for k,v in batch.items()
+    }
 
 
 if __name__ == '__main__':
@@ -101,19 +124,34 @@ if __name__ == '__main__':
     print('Creating vocabulary...')
     vocab = Vocabulary()
 
-    dataset = SentenceBoundaryDataset(annotations, vocab, shuffle=True)
-    sample = dataset[0]
-    print('Sample:', sample)
+
 
     config = {
+        'seed': 0,
         'input_size': len(vocab),
         'emb_size': 48,
-        'hidden_size': 32,
         'num_layers': 1,
+        'hidden_size': 32,
         'n_tags': len(vocab.tagnames),
         'output_size': 2,
         'dropout': 0.5,
+        'optimizer_kwargs': {'lr': 0.003, 'weight_decay': 0.00001},
+        'lr_scheduler': 'CosineAnnealingWarmRestarts',
+        'lr_scheduler_kwargs': {'T_0': 60},
+        # 'lr_scheduler_kwargs': {'T_0': 20},
+        # 'lr_scheduler': 'StepLR',
+        # 'lr_scheduler_kwargs': {'step_size': 50,'gamma': 0.1},
+        # 'dataset_kwargs': {'shuffle': False}, 
+        'dataset_kwargs': {'shuffle': True, 'window_size': 3, 'batch_size': 8}, 
+        'n_features': Features.get_n_features(),
+        'feature_transform': True,
+        'use_heuristic_predictions': True
     }
+
+    heuristic_model = HeuristicModel() if config['use_heuristic_predictions'] else None
+    dataset = SentenceBoundaryDataset(annotations, vocab, shuffle=True, heuristic_model=heuristic_model)
+    sample = dataset[0]
+    print('Sample:', sample)
 
     model = SentenceBoundaryModel(config)
     
