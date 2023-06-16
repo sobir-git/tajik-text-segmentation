@@ -5,27 +5,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "src.nn_model.train",
+            "name": "training.nn_model.train",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "module": "src.nn_model.train",
+            "module": "training.nn_model.train",
             "justMyCode": true
         },
         {
-            "name": "src.evaluate",
+            "name": "training.evaluate",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "module": "src.evaluate",
+            "module": "training.evaluate",
             "justMyCode": true
         },
         {
-            "name": "src.text_segmenter",
+            "name": "tajik_text_segmentation.text_segmenter",
             "type": "python",
             "request": "launch",
             "console": "integratedTerminal",
-            "module": "src.text_segmenter",
+            "module": "tajik_text_segmentation.text_segmenter",
             "justMyCode": true
         },
 

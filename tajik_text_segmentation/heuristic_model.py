@@ -2,7 +2,7 @@ import re
 
 import numpy as np
 
-from src.nn_model.boundary_resolver import SentenceBoundaryResolver
+from tajik_text_segmentation.boundary_resolver import SentenceBoundaryResolver
 
 
 class Features:

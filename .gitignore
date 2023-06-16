@@ -1,5 +1,58 @@
 __pycache__/
+
+# Python related
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+pdb.*
+.python-version
+pip-debug.log
+pyvenv.cfg
+venv/
+env/
+build/
+dist/
+*.egg-info/
+*.egg
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Configuration files
+.config
+.DS_Store
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.pytest_cache
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+data/
+
+# Checkpoints (These should be included in the package, but not version controlled)
+checkpoints/
+
+# Weights and biases logs
 wandb/
-*.pyc
 *.env
-*.pt

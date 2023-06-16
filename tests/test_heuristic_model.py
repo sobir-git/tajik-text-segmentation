@@ -1,5 +1,5 @@
 
-from src.heuristic_model import predict_token
+from tajik_text_segmentation.heuristic_model import predict_token
 
 
 def test_predict_token():

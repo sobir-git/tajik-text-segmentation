@@ -2,10 +2,10 @@ import random
 from typing import List
 from torch.utils.data import Dataset
 import torch
-from src.dataset import Annotated, load_dataset, tokenize_annotation
-from src.heuristic_model import HeuristicModel
+from tajik_text_segmentation.annotated import Annotated, load_dataset, tokenize_annotation
+from tajik_text_segmentation.heuristic_model import HeuristicModel
 
-from src.nn_model.vocab import Vocabulary
+from tajik_text_segmentation.nn_model.vocab import Vocabulary
 
 
 class SentenceBoundaryDataset(Dataset):

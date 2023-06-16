@@ -1,6 +1,6 @@
 import datasets
 
-from src.tokenizer import tokenize_text
+from tajik_text_segmentation.tokenizer import tokenize_text
 
 
 class Annotated:

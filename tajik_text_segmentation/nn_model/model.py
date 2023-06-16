@@ -1,12 +1,65 @@
 import copy
+import os
+import pkg_resources
 import torch 
 import torch.nn as nn
 
-from src.dataset import load_dataset, tokenize_annotation
-from src.heuristic_model import Features, HeuristicModel
-from src.nn_model.boundary_resolver import SentenceBoundaryResolver
-from src.nn_model.dataset import SentenceBoundaryDataset
-from src.nn_model.vocab import Vocabulary
+from tajik_text_segmentation.annotated import load_dataset, tokenize_annotation
+from tajik_text_segmentation.heuristic_model import Features, HeuristicModel
+from tajik_text_segmentation.boundary_resolver import SentenceBoundaryResolver
+from tajik_text_segmentation.nn_model.vocab import Vocabulary
+
+
+class Checkpoint:
+    def __init__(self, path, config: dict, model: nn.Module, vocab: Vocabulary):
+        self.path = path
+        self.config = config
+        self.model = model
+        self.vocab = vocab
+        self.metrics = {}
+
+        # ensure path directory exists
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+    
+    def save(self):
+        torch.save({
+            'config': self.config,
+            'model': self.model.state_dict(),
+            'vocab': self.vocab.state_dict(),
+            'metrics': self.metrics
+        }, self.path)
+
+    def load(self, device='cpu'):
+        checkpoint = torch.load(self.path, map_location=device)
+        print(f"Loaded checkpoint: {self.path}; metrics: {checkpoint['metrics']}")
+        self.config = checkpoint['config']
+        self.metrics = checkpoint['metrics']
+        self.model.load_state_dict(checkpoint['model'])
+        self.vocab.load_state_dict(checkpoint['vocab'])
+
+    @classmethod
+    def init_from_path(cls, path, device='cpu'):
+        resource_package = 'tajik_text_segmentation'  # Name of your package
+        resource_path = f'checkpoints/checkpoint.pt'  # Relative path to the checkpoint file within your package
+        
+        # Getting the absolute path to the checkpoint file
+        abs_path = pkg_resources.resource_filename(resource_package, resource_path)
+        
+        # Load the checkpoint
+        checkpoint = torch.load(abs_path, map_location=device)
+        print(f"Loaded checkpoint: {path}; metrics: {checkpoint['metrics']}")
+        
+        config = checkpoint['config']
+
+        # init model and vocab
+        model = SentenceBoundaryModel(config)
+        vocab = Vocabulary()
+        
+        # load state dicts
+        model.load_state_dict(checkpoint['model'])
+        vocab.load_state_dict(checkpoint['vocab'])
+
+        return cls(path, config, model, vocab)
 
 
 class BOWEmbedding(nn.Module):
@@ -113,6 +166,8 @@ def batch_to_device(batch: dict, device):
 
 
 if __name__ == '__main__':
+    from training.nn_model.dataset import SentenceBoundaryDataset
+
     device = 'cpu'
 
     print('Loading dataset...')

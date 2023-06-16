@@ -1,8 +1,8 @@
 import numpy as np
-from src.dataset import load_dataset
-from src.dummy_model import DummyModel
+from tajik_text_segmentation.annotated import load_dataset
+from training.dummy_model import DummyPredictor
 
-from src.evaluate import evaluate_segmentation, evaluate_from_text
+from training.evaluate import evaluate_segmentation, evaluate_from_text
 
 
 def test_evalute_segmentation():
@@ -35,7 +35,7 @@ def test_evalute_segmentation():
 
 def test_evaluate_from_text():
     annotations = load_dataset()[:10]
-    model = DummyModel()
+    model = DummyPredictor()
     results = evaluate_from_text(model, annotations)
     assert results['start_f1'] > 0
     assert results['end_f1'] > 0

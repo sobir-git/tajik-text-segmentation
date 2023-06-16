@@ -1,7 +1,7 @@
 {
     "models": {
         "nn": {
-            "checkpoint_path": "checkpoints/checkpoint.pt",
+            "checkpoint_path": "tajik_text_segmentation/checkpoints/checkpoint.pt",
             "resolver_kwargs": {
                 "max_candidates": 10, 
                 "candidate_threshold":0.25

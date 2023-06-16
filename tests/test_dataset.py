@@ -1,5 +1,5 @@
 import pytest
-from src.dataset import load_dataset, get_labels, tokenize_annotation
+from tajik_text_segmentation.annotated import load_dataset, get_labels, tokenize_annotation
 
 
 def test_load_dataset():
@@ -31,7 +31,7 @@ def test_get_labels(spans, indices, expected):
 def test_tokenize_annotation(ann):
     """For each span checks if any indices belong to it."""
     tann = tokenize_annotation(ann)
-    assert len(tann['tokens']) == len(tann['start_labels']) == len(tann['end_labels'])
-    assert tann['start_labels'] == [1, 0, 1, 0]
-    assert tann['end_labels'] == [0, 1, 0, 1]
-    assert tann['spans'] == [[0,2],[2,4]]
+    assert len(tann.tokens) == len(tann.start_labels) == len(tann.end_labels)
+    assert tann.start_labels == [1, 0, 1, 0]
+    assert tann.end_labels == [0, 1, 0, 1]
+    assert tann.spans == [(0,2),(2,4)]

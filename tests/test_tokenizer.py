@@ -1,4 +1,4 @@
-from src.tokenizer import tokenize_text
+from tajik_text_segmentation.tokenizer import tokenize_text
 
 
 def test_tokenize_text():

@@ -1,12 +1,13 @@
 import re
 import json
-from src.dataset import Annotated
-from src.heuristic_model import HeuristicModel, HeuristicPredictor
-from src.nn_model.boundary_resolver import SentenceBoundaryResolver
-from src.nn_model.model import NNPredictor
+from tajik_text_segmentation.annotated import Annotated
+from tajik_text_segmentation.heuristic_model import HeuristicModel, HeuristicPredictor
+from tajik_text_segmentation.boundary_resolver import SentenceBoundaryResolver
+from tajik_text_segmentation.nn_model.model import Checkpoint, NNPredictor
 
-from src.nn_model.train import Checkpoint
-from src.tokenizer import tokenize_text
+from tajik_text_segmentation.tokenizer import tokenize_text
+
+import pkg_resources
 
 
 def preprocess_text(text: str):
@@ -20,8 +21,14 @@ def preprocess_text(text: str):
 
 
 def load_config():
-    with open('config.json') as f:
-        return json.load(f)
+
+    resource_package = 'tajik_text_segmentation'
+    resource_path = 'config.json'  # Relative path to config.json within the package
+
+    config_string = pkg_resources.resource_string(resource_package, resource_path)
+    config = json.loads(config_string.decode())
+
+    return config
 
 
 def load_predictor(model_name):
@@ -76,5 +83,3 @@ if __name__ == '__main__':
     print('Per token probabilities:')
     for t, (sp, ep) in zip(result['tokens'], result['probs']):
         print(f"{repr(t):20s}  start: {sp:.2f}  end: {ep:.2f}")
-    
-

@@ -1,12 +1,8 @@
 import numpy as np
 from sklearn.metrics import precision_recall_fscore_support
 
-from src.dataset import Annotated, load_dataset, tokenize_annotation
-from src.heuristic_model import HeuristicModel
-from src.nn_model.boundary_resolver import SentenceBoundaryResolver
-from src.nn_model.model import NNPredictor
-from src.nn_model.train import Checkpoint
-from src.text_segmenter import load_predictor
+from tajik_text_segmentation.annotated import Annotated, load_dataset, tokenize_annotation
+from tajik_text_segmentation.text_segmenter import load_predictor
 
 
 def evaluate_segmentation(labels: np.ndarray, predictions: np.ndarray):

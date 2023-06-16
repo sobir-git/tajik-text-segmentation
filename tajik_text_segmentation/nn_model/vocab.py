@@ -4,8 +4,8 @@ import numpy as np
 
 import torch
 
-from src.dataset import load_dataset
-from src.heuristic_model import Features
+from tajik_text_segmentation.annotated import load_dataset
+from tajik_text_segmentation.heuristic_model import Features
 
 
 class Vocabulary:

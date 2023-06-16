@@ -1,5 +1,4 @@
 torch
-datasets
 numpy
 python-dotenv
-wandb
+scikit_learn

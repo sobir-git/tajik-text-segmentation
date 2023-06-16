@@ -1,59 +1,12 @@
-import os
 import torch
 import torch.nn as nn
-from src.dataset import load_dataset, tokenize_annotation
-from src.heuristic_model import Features, HeuristicModel
-from src.nn_model.dataset import SentenceBoundaryDataset
-from src.nn_model.model import SentenceBoundaryModel, batch_to_device
+from tajik_text_segmentation.annotated import load_dataset, tokenize_annotation
+from tajik_text_segmentation.heuristic_model import Features, HeuristicModel
+from training.nn_model.dataset import SentenceBoundaryDataset
+from tajik_text_segmentation.nn_model.model import SentenceBoundaryModel, batch_to_device
 
-from src.nn_model.utils import Average, seed_everything
-from src.nn_model.vocab import Vocabulary
-
-
-
-class Checkpoint:
-    def __init__(self, path, config: dict, model: nn.Module, vocab: Vocabulary):
-        self.path = path
-        self.config = config
-        self.model = model
-        self.vocab = vocab
-        self.metrics = {}
-
-        # ensure path directory exists
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
-    
-    def save(self):
-        torch.save({
-            'config': self.config,
-            'model': self.model.state_dict(),
-            'vocab': self.vocab.state_dict(),
-            'metrics': self.metrics
-        }, self.path)
-
-    def load(self, device='cpu'):
-        checkpoint = torch.load(self.path, map_location=device)
-        print(f"Loaded checkpoint: {self.path}; metrics: {checkpoint['metrics']}")
-        self.config = checkpoint['config']
-        self.metrics = checkpoint['metrics']
-        self.model.load_state_dict(checkpoint['model'])
-        self.vocab.load_state_dict(checkpoint['vocab'])
-
-    @classmethod
-    def init_from_path(cls, path, device='cpu'):
-        checkpoint = torch.load(path, map_location=device)
-        print(f"Loaded checkpoint: {path}; metrics: {checkpoint['metrics']}")
-        
-        config = checkpoint['config']
-
-        # init model and vocab
-        model = SentenceBoundaryModel(config)
-        vocab = Vocabulary()
-        
-        # load state dicts
-        model.load_state_dict(checkpoint['model'])
-        vocab.load_state_dict(checkpoint['vocab'])
-
-        return cls(path, config, model, vocab)
+from training.utils import Average, seed_everything
+from tajik_text_segmentation.nn_model.vocab import Vocabulary
 
 
 def train(model, optimizer, criterion, train_dataset, test_dataset, num_epochs=100, device='cpu', lr_scheduler=None, checkpoint: Checkpoint=None):
