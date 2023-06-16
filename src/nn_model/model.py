@@ -103,7 +103,7 @@ class NNPredictor:
         logits = self.model(pack)
         probs = torch.sigmoid(logits).cpu().numpy()
         preds = self.resolver.resolve(probs, binarize_output=True)
-        return preds
+        return { 'preds': preds, 'probs': probs }
 
 
 def batch_to_device(batch: dict, device):

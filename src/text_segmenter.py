@@ -49,9 +49,18 @@ class TextSegmenter:
 
         # tokenize
         tokens, token_spans = tokenize_text(text)
-        boundaries = self.predictor.predict(tokens)
+        d = self.predictor.predict(tokens)
+        preds = d['preds']
 
-        return Annotated(tokens, start_labels=boundaries[:, 0], end_labels=boundaries[:,1])
+        ann = Annotated(tokens, start_labels=preds[:, 0], end_labels=preds[:,1])
+        d['tokens'] = tokens
+        d['spans'] = ann.spans
+        d['annotated_text'] = ann.annotated_text
+        d['sentences'] = ann.get_sentences()
+        d['token_spans'] = token_spans
+        d['text'] = text
+
+        return d
 
 
 if __name__ == '__main__':
@@ -61,10 +70,11 @@ if __name__ == '__main__':
 Осоишгоҳи Зумрад, «Баҳористон», «Конибодом», «Ҳавотоғ», ва «Ӯротеппа» ва диг. дар вилояти Суғд;
 «Чилучорчашма», «Сари Хосор» ва диг. дар вилояти Хатлон;
 «Гармчашма» ва диг. дар ВМКБ амал карда истодаанд.'''
-    segmenter = TextSegmenter('heuristic')
-    # segmenter = TextSegmenter('nn')
-    ann = segmenter.segment_text(text)
-    print("Annotated text:", ann.annotated_text)
-    print("Tokens:", ann.tokens)
-    print("Spans:", ann.spans)
-    print("Sentences:", ann.get_sentences())
+    segmenter = TextSegmenter('nn')  # or 'heuristic'
+    result = segmenter.segment_text(text)
+    print('Sentences:', result['sentences'])
+    print('Per token probabilities:')
+    for t, (sp, ep) in zip(result['tokens'], result['probs']):
+        print(f"{repr(t):20s}  start: {sp:.2f}  end: {ep:.2f}")
+    
+

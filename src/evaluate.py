@@ -61,8 +61,7 @@ def evaluate_from_text(model, annotations: "list[Annotated]", display_report: bo
         ann = tokenize_annotation(ann)
         sl = ann.start_labels
         el = ann.end_labels
-        pred = model.predict(ann.tokens)
-
+        pred = model.predict(ann.tokens)['preds']
         pred = np.asarray(pred, dtype=np.int32)  # (len(tokens),2)
         sl = np.asarray(sl, dtype=np.int32)
         el = np.asarray(el, dtype=np.int32)

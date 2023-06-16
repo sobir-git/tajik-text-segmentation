@@ -164,4 +164,6 @@ class HeuristicPredictor:
         # soften probs
         probs = np.clip(probs, self.damping, 1-self.damping)
 
-        return self.resolver.resolve(probs, binarize_output=True)
+        preds = self.resolver.resolve(probs, binarize_output=True)
+
+        return { 'preds': preds, 'probs': probs }
