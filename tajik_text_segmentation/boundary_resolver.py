@@ -38,16 +38,45 @@ class SentenceBoundaryResolver:
                         - else, returns a binary array of same shape as probs with the same semantics
         '''
 
+        # The algorithm tries to maximize the segmentation likelyhood defined as the sum of log probabilities
+        # of individual choices (is_start, not_is_start, is_end, not_is_end) made at each token.
+        # Note that not all segmentations are valid, thus simply selecting the choice with the highest
+        # log probability is not sufficient.
+
+
+        # log probability
         logp = np.log(probs).tolist()
+        
+        # log complementary probability
         logcomp = np.log(1-probs).tolist()
-        cumul = np.cumsum(logcomp).tolist()
+
+        # cumulative log complementary probabilities used for calculating sum in token ranges
+        cumul = np.cumsum(logcomp, axis=1).sum(axis=1).tolist()
+
+        assert len(cumul) == len(logcomp), (len(cumul), len(logcomp))
+        assert isinstance(cumul[0], float)
+
+        # initialize dp array representing the highest likelyhood a segmentation can have up to the i-th token's 
+        # beginning (dp[i][0]) or end (dp[i][1])
         dp = [[-float('inf')]*2 for _ in range(len(logp))]
+
+        # used for backtracking the best segmentation
         prev = [[None]*2 for _ in range(len(logp))]
-        candidates = [0]  # 0 is always the first "start" index candidate
+
+        # candidate list which contains candidate "start" indices
+        # candidates = list(range(max_gap+1))  # the start index can be 0, ... , max_gap
+        candidates = [0]  # the start index can be 0, ... , max_gap
+        
+        # logprobability threshold for considering an index as a candidate
         logp_threshold = np.log(self.candidate_threshold)
 
-        dp[0][0] = logp[0][0]
+        # initialize initial values
+        dp[0][0] = logp[0][0]   # --> the log-likelihood of the segmentation up to start of the 0th token
+
+        # --> the log-likelihood of the segmentation up to the end of the 0th token
         dp[0][1] = logp[0][1] + dp[0][0]
+        
+        # end of the 0th token is mapped to the start of the 0th token
         prev[0][1] = 0
 
         for i in range(1, len(logp)):
@@ -61,7 +90,7 @@ class SentenceBoundaryResolver:
                     candidates.pop(0)  # remove oldest candidate
 
             choices = {
-                k: cumul[i] - (cumul[k-1] if k else 0) - logcomp[k][0] + dp[k][0]
+                k: cumul[i] - (cumul[k-1] if k else 0.) - logcomp[k][0] + dp[k][0]
                 for k in candidates
             }
 
