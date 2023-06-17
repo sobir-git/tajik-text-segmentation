@@ -54,10 +54,11 @@ class SentenceBoundaryResolver:
 
         max_gap = self.max_gap
 
+        probs = np.concatenate([probs, [[1,1]]])  # dummy token that is supposed to be a sentence in itself
 
         # log probability
         logp = np.log(probs).tolist()
-        
+
         # log complementary probability
         logcomp = np.log(1-probs).tolist()
 
@@ -124,9 +125,9 @@ class SentenceBoundaryResolver:
 
     def backtrack(self, prev, binarize_output):
         # backtrack to return sentence boundaries
+        i = prev[len(prev)-1][0]  # that dummy sentence start
         if binarize_output:
-            bounds = [[0,0] for _ in range(len(prev))]
-            i = len(prev) - 1
+            bounds = [[0,0] for _ in range(len(prev)-1)]
             while i is not None:
                 bounds[i][1] = 1
                 j = prev[i][1]
@@ -135,7 +136,6 @@ class SentenceBoundaryResolver:
             return np.array(bounds)
         else:
             spans = []
-            i = len(prev) - 1
             while i is not None:
                 j = prev[i][1]
                 spans.append((j,i+1))
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     # print original boundaries
     # add some noise to binary probabilities
-    noise = np.clip(np.abs(np.random.normal(0, 0.25, size=x.shape)), 0.01, 0.99)
+    noise = np.clip(np.abs(np.random.normal(0, 0.1, size=x.shape)), 0.01, 0.99)
     noisy_x = np.copy(x)
     noisy_x[x==0] += noise[x==0]
     noisy_x[x==1] -= noise[x==1]
