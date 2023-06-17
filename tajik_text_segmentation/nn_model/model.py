@@ -31,7 +31,7 @@ class Checkpoint:
 
     def load(self, device='cpu'):
         checkpoint = torch.load(self.path, map_location=device)
-        print(f"Loaded checkpoint: {self.path}; metrics: {checkpoint['metrics']}")
+        # print(f"Loaded checkpoint: {self.path}; metrics: {checkpoint['metrics']}")
         self.config = checkpoint['config']
         self.metrics = checkpoint['metrics']
         self.model.load_state_dict(checkpoint['model'])
@@ -47,7 +47,7 @@ class Checkpoint:
         
         # Load the checkpoint
         checkpoint = torch.load(abs_path, map_location=device)
-        print(f"Loaded checkpoint: {path}; metrics: {checkpoint['metrics']}")
+        # print(f"Loaded checkpoint: {path}; metrics: {checkpoint['metrics']}")
         
         config = checkpoint['config']
 

@@ -4,14 +4,16 @@
             "checkpoint_path": "tajik_text_segmentation/checkpoints/checkpoint.pt",
             "resolver_kwargs": {
                 "max_candidates": 10, 
-                "candidate_threshold":0.25
+                "candidate_threshold":0.25,
+                "max_gap": 3
             }
         },
         "heuristic": {
             "predictor_kwargs": {"damping": 0.025},
             "resolver_kwargs": {
                 "max_candidates": 5, 
-                "candidate_threshold":0.25
+                "candidate_threshold":0.25,
+                "max_gap": 3
             }
         }
     }

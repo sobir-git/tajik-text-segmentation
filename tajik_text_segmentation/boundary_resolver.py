@@ -19,9 +19,18 @@ import numpy as np
 
 
 class SentenceBoundaryResolver:
-    def __init__(self, max_candidates=10, candidate_threshold=0.25) -> None:
+    def __init__(self, max_candidates=10, candidate_threshold=0.25, max_gap=3) -> None:
+        '''
+        Arguments:
+            max_candidates: int, maximum number of sentence start candidates to consider
+                            for a particular sentence end
+            candidate_threshold: float, log probability threshold for considering an index 
+                                 as a sentence start candidate
+            max_gap: int, maximum gap length between sentences; 0 means no gap
+        '''
         self.max_candidates = max_candidates
         self.candidate_threshold = candidate_threshold
+        self.max_gap = max_gap
 
     def resolve(self, probs: np.ndarray, binarize_output=False):
         '''
@@ -42,6 +51,8 @@ class SentenceBoundaryResolver:
         # of individual choices (is_start, not_is_start, is_end, not_is_end) made at each token.
         # Note that not all segmentations are valid, thus simply selecting the choice with the highest
         # log probability is not sufficient.
+
+        max_gap = self.max_gap
 
 
         # log probability
@@ -64,8 +75,7 @@ class SentenceBoundaryResolver:
         prev = [[None]*2 for _ in range(len(logp))]
 
         # candidate list which contains candidate "start" indices
-        # candidates = list(range(max_gap+1))  # the start index can be 0, ... , max_gap
-        candidates = [0]  # the start index can be 0, ... , max_gap
+        candidates = list(range(max_gap+1))  # the start index can be 0, ... , max_gap
         
         # logprobability threshold for considering an index as a candidate
         logp_threshold = np.log(self.candidate_threshold)
@@ -80,24 +90,34 @@ class SentenceBoundaryResolver:
         prev[0][1] = 0
 
         for i in range(1, len(logp)):
-            dp[i][0] = dp[i-1][1] + logp[i][0]
-            prev[i][0] = i-1
+            # update dp[i][0]
+            choices = {
+                k: - cumul[k] + dp[k][1]
+                for k in range(max(0, i-max_gap-1),i)
+            }
+
+            # choose k with highest value
+            best_k = max(choices.keys(), key=choices.get)
+            best_v = max(choices.values())
+            dp[i][0] = cumul[i-1] + best_v + logp[i][0]
+            prev[i][0] = best_k
 
             # update candidates list
-            if logp[i][0] + logp[i-1][1] >= logp_threshold:
+            if logp[i][0] + logp[best_k][1] >= logp_threshold:
                 candidates.append(i)
                 if len(candidates) > self.max_candidates:
                     candidates.pop(0)  # remove oldest candidate
 
+            # update dp[i][1]
             choices = {
-                k: cumul[i] - (cumul[k-1] if k else 0.) - logcomp[k][0] + dp[k][0]
+                k: - (cumul[k-1] if k else 0.) - logcomp[k][0] + dp[k][0]
                 for k in candidates
             }
 
             # choose k with highest value
             best_k = max(choices.keys(), key=choices.get)
             best_v = max(choices.values())
-            dp[i][1] = best_v + logp[i][1] - logcomp[i][1] + dp[best_k][0]
+            dp[i][1] = cumul[i] + best_v + logp[i][1] - logcomp[i][1]
             prev[i][1] = best_k
         
         return self.backtrack(prev, binarize_output)
@@ -138,15 +158,18 @@ if __name__ == '__main__':
     # print original boundaries
     # add some noise to binary probabilities
     noise = np.clip(np.abs(np.random.normal(0, 0.25, size=x.shape)), 0.01, 0.99)
-    x[x==0] += noise[x==0]
-    x[x==1] -= noise[x==1]
+    noisy_x = np.copy(x)
+    noisy_x[x==0] += noise[x==0]
+    noisy_x[x==1] -= noise[x==1]
 
     # print noisy boundaries (probabilities)
-    print(np.round(x, 2))
+    print(np.round(noisy_x, 2))
 
     resolver = SentenceBoundaryResolver(max_candidates=4, candidate_threshold=0.25)
-    spans = resolver.resolve(x, binarize_output=True)
-    
+    spans = resolver.resolve(noisy_x, binarize_output=True)
+
     # display resulting spans
     print(spans)
+
+    assert np.allclose(x, spans)  # must not fail with high probability
 
