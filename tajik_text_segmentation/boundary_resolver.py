@@ -76,7 +76,7 @@ class SentenceBoundaryResolver:
         prev = [[None]*2 for _ in range(len(logp))]
 
         # candidate list which contains candidate "start" indices
-        candidates = list(range(max_gap+1))  # the start index can be 0, ... , max_gap
+        candidates = list(range(min(max_gap+1, len(logp))))  # the start index can be 0, ... , max_gap
         
         # logprobability threshold for considering an index as a candidate
         logp_threshold = np.log(self.candidate_threshold)

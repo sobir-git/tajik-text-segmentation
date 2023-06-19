@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="tajik_text_segmentation",
-    version="0.1.6",
+    version="0.1.7",
     author="Sobir Bobiev",
     author_email="sobir.bobiev@gmail.com",
     description="A package for Tajik text segmentation using a heuristic algorithm and neural network.",
