@@ -1,5 +1,10 @@
 # Tajik text segmentation
 
+Install using pip:
+```
+pip install tajik-text-segmentation
+```
+
 Usage:
 ```python
 from tajik_text_segmentation import TextSegmenter
